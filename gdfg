@@ -1,44 +1,138 @@
-local function moveGoldBar()
-    -- الحصول على الخدمات داخل الفنكشن نفسه
+local function moveTo(humanoid, targetPoint, andThen)
+    local targetReached = false
+
+    local connection
+    connection = humanoid.MoveToFinished:Connect(function(reached)
+        targetReached = true
+        connection:Disconnect()
+        connection = nil
+        if andThen then
+            andThen(reached)
+        end
+    end)
+
+    humanoid:MoveTo(targetPoint)
+
+    task.spawn(function()
+        while not targetReached do
+            if not (humanoid and humanoid.Parent) then
+                break
+            end
+            if humanoid.WalkToPoint ~= targetPoint then
+                break
+            end
+            humanoid:MoveTo(targetPoint)
+            task.wait(6)
+        end
+
+        if connection then
+            connection:Disconnect()
+            connection = nil
+        end
+    end)
+end
+
+local function requestDrag(goldBar, callback)
     local ReplicatedStorage = game:GetService("ReplicatedStorage")
-    local Workspace = game:GetService("Workspace")
-    local player = game.Players.LocalPlayer
-
-    -- الحصول على الذهبي بار
-    local goldBar = Workspace.RuntimeItems:FindFirstChild("GoldBar")
-    if not goldBar then
-        print("GoldBar not found!")
-        return
-    end
-
-    local probGoldBar = goldBar:FindFirstChild("Prop_GoldBar")
-    if not probGoldBar then
-        print("Prop_GoldBar not found!")
-        return
-    end
-
-    -- إرسال طلب البدء في سحب الذهب
     local args = { [1] = goldBar }
+
     local success, errorMessage = pcall(function()
         ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Remotes"):WaitForChild("RequestStartDrag"):FireServer(unpack(args))
     end)
 
     if not success then
-        print("Error occurred while requesting drag: " .. errorMessage)
+        print("❌ خطأ أثناء تفعيل RequestStartDrag: " .. errorMessage)
         return
     end
+    
+    print("✅ تم تفعيل RequestStartDrag! سيتم تغيير موقع الذهب بعد ثانيتين...")
 
-    -- تحديد الموقع الجديد للذهب
-    local targetPart = Workspace.StartingZone.Buildings.TradingPost.BountySquare:FindFirstChildWhichIsA("Part")
-    if not targetPart then
-        print("Target part not found!")
-        return
-    end
-
-    -- تحريك الذهب إلى الموقع الجديد
-    probGoldBar.CFrame = targetPart.CFrame
-    print("Gold moved to target!")
+    task.delay(2, function()
+        callback()
+    end)
 end
 
--- استدعاء دالة moveGoldBar مباشرة عند بداية السكربت
-moveGoldBar()
+local function moveGoldBarToTarget(goldBar, callback)
+    local bountySquare = workspace:WaitForChild("StartingZone"):WaitForChild("Buildings"):WaitForChild("TradingPost"):WaitForChild("BountySquare")
+    local targetPart = nil
+
+    for _, part in pairs(bountySquare:GetChildren()) do
+        if part:IsA("BasePart") and part:FindFirstChildOfClass("SurfaceGui") then
+            targetPart = part
+            break
+        end
+    end
+
+    if not targetPart then
+        print("❌ لم يتم العثور على البارت المناسب في BountySquare!")
+        return
+    end
+
+    if goldBar.PrimaryPart then
+        goldBar:SetPrimaryPartCFrame(targetPart.CFrame)
+        print("✅ تم نقل GoldBar إلى الموقع الجديد: " .. tostring(targetPart.Position))
+
+        -- بعد 0.5 ثانية، يذهب لتفعيل ProximityPrompt
+        task.delay(0.5, function()
+            callback()
+        end)
+    else
+        print("❌ خطأ: GoldBar ليس لديه PrimaryPart!")
+    end
+end
+
+local function activateMoneyBag()
+    local moneyBag = workspace:WaitForChild("RuntimeItems"):FindFirstChild("Moneybag")
+    if not moneyBag then
+        print("❌ لم يتم العثور على Moneybag!")
+        return
+    end
+
+    local proximityPrompt = moneyBag:FindFirstChildWhichIsA("ProximityPrompt", true)
+    if not proximityPrompt or proximityPrompt.Name ~= "MoneyBag" then
+        print("❌ لم يتم العثور على ProximityPrompt المناسب داخل Moneybag!")
+        return
+    end
+
+    -- تفعيل الـ ProximityPrompt
+    fireproximityprompt(proximityPrompt)
+    print("✅ تم تفعيل MoneyBag ProximityPrompt!")
+end
+
+local function collectGoldBar()
+    local player = game.Players.LocalPlayer
+    local character = player.Character or player.CharacterAdded:Wait()
+    local humanoid = character:WaitForChild("Humanoid")
+    local rootPart = character:WaitForChild("HumanoidRootPart")
+
+    local goldBar = workspace.RuntimeItems:FindFirstChild("GoldBar")
+    if not goldBar then
+        print("❌ لم يتم العثور على GoldBar!")
+        return
+    end
+
+    local propGoldBar = goldBar:FindFirstChild("Prop_GoldBar")
+    if not propGoldBar then
+        print("❌ لم يتم العثور على Prop_GoldBar!")
+        return
+    end
+
+    if not goldBar.PrimaryPart then
+        print("❌ خطأ: GoldBar ليس لديه PrimaryPart!")
+        return
+    end
+
+    local targetPosition = goldBar.PrimaryPart.Position
+
+    moveTo(humanoid, targetPosition, function(reached)
+        if reached then
+            requestDrag(goldBar, function()
+                moveGoldBarToTarget(goldBar, function()
+                    activateMoneyBag()
+                end)
+            end)
+        end
+    end)
+end
+
+collectGoldBar()
