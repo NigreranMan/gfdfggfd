@@ -1,0 +1,121 @@
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Workspace = game:GetService("Workspace")
+
+local player = Players.LocalPlayer
+local character = player.Character or player.CharacterAdded:Wait()
+local humanoid = character:WaitForChild("Humanoid")
+local rootPart = character:WaitForChild("HumanoidRootPart")
+
+-- دالة لتحريك اللاعب
+local function moveTo(humanoid, targetPoint, andThen)
+    local targetReached = false
+
+    local connection
+    connection = humanoid.MoveToFinished:Connect(function(reached)
+        targetReached = true
+        connection:Disconnect()
+        connection = nil
+        if andThen then
+            andThen(reached)
+        end
+    end)
+
+    humanoid:MoveTo(targetPoint)
+
+    task.spawn(function()
+        while not targetReached do
+            if not (humanoid and humanoid.Parent) then
+                break
+            end
+            if humanoid.WalkToPoint ~= targetPoint then
+                break
+            end
+            humanoid:MoveTo(targetPoint)
+            task.wait(6)
+        end
+
+        if connection then
+            connection:Disconnect()
+            connection = nil
+        end
+    end)
+end
+
+-- البحث عن `Prob_GoldBar`
+local function findGoldBar()
+    local goldBarFolder = Workspace:FindFirstChild("RuntimeItems")
+        and Workspace.RuntimeItems:FindFirstChild("GoldBar")
+
+    if goldBarFolder then
+        local goldBar = goldBarFolder:FindFirstChild("Prob_GoldBar")
+        if goldBar then
+            print("[INFO] تم العثور على الذهب!")
+            return goldBar
+        else
+            warn("[WARNING] لم يتم العثور على `Prob_GoldBar` داخل `GoldBar`!")
+        end
+    else
+        warn("[WARNING] لم يتم العثور على `GoldBar` داخل `RuntimeItems`!")
+    end
+    return nil
+end
+
+-- إرسال طلب `RequestStartDrag`
+local function requestDrag(goldBar)
+    local args = {
+        [1] = goldBar
+    }
+    print("[INFO] إرسال طلب `RequestStartDrag` للذهب...")
+    ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Remotes"):WaitForChild("RequestStartDrag"):FireServer(unpack(args))
+end
+
+-- البحث عن `Part` داخل `BountySquare` الذي يحتوي على `SurfaceGui`
+local function findBountySquarePart()
+    local tradingPost = Workspace:FindFirstChild("StartingZone")
+        and Workspace.StartingZone:FindFirstChild("Buildings")
+        and Workspace.StartingZone.Buildings:FindFirstChild("TradingPost")
+
+    if not tradingPost then
+        warn("[WARNING] لم يتم العثور على `TradingPost` داخل `Buildings`!")
+        return nil
+    end
+
+    local bountySquare = tradingPost:FindFirstChild("BountySquare")
+    if not bountySquare then
+        warn("[WARNING] لم يتم العثور على `BountySquare` داخل `TradingPost`!")
+        return nil
+    end
+
+    for _, part in ipairs(bountySquare:GetChildren()) do
+        if part:IsA("BasePart") and part:FindFirstChild("SurfaceGui") then
+            print("[INFO] تم العثور على `Part` الصحيح داخل `BountySquare`!")
+            return part
+        end
+    end
+
+    warn("[WARNING] لم يتم العثور على أي `Part` يحتوي على `SurfaceGui` داخل `BountySquare`!")
+    return nil
+end
+
+-- تنفيذ المهمة
+local goldBar = findGoldBar()
+if goldBar and goldBar:IsA("BasePart") then
+    moveTo(humanoid, goldBar.Position, function(reached)
+        if reached then
+            requestDrag(goldBar)
+
+            local bountyPart = findBountySquarePart()
+            if bountyPart then
+                print("[INFO] تغيير موضع `GoldBar` إلى `BountySquare Part`...")
+                goldBar.Position = bountyPart.Position
+            else
+                warn("[ERROR] لم يتم العثور على `BountySquare Part` لنقل الذهب إليه!")
+            end
+        else
+            warn("[ERROR] لم يتمكن اللاعب من الوصول إلى `Prob_GoldBar`!")
+        end
+    end)
+else
+    warn("[ERROR] لم يتم العثور على `GoldBar`، لا يمكن إكمال المهمة!")
+end
