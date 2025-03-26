@@ -1,4 +1,44 @@
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local Workspace = game:GetService("Workspace")
-local player = game.Players.LocalPlayer
+local function moveGoldBar()
+    -- الحصول على الخدمات داخل الفنكشن نفسه
+    local ReplicatedStorage = game:GetService("ReplicatedStorage")
+    local Workspace = game:GetService("Workspace")
+    local player = game.Players.LocalPlayer
 
+    -- الحصول على الذهبي بار
+    local goldBar = Workspace.RuntimeItems:FindFirstChild("GoldBar")
+    if not goldBar then
+        print("GoldBar not found!")
+        return
+    end
+
+    local probGoldBar = goldBar:FindFirstChild("Prop_GoldBar")
+    if not probGoldBar then
+        print("Prop_GoldBar not found!")
+        return
+    end
+
+    -- إرسال طلب البدء في سحب الذهب
+    local args = { [1] = goldBar }
+    local success, errorMessage = pcall(function()
+        ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Remotes"):WaitForChild("RequestStartDrag"):FireServer(unpack(args))
+    end)
+
+    if not success then
+        print("Error occurred while requesting drag: " .. errorMessage)
+        return
+    end
+
+    -- تحديد الموقع الجديد للذهب
+    local targetPart = Workspace.StartingZone.Buildings.TradingPost.BountySquare:FindFirstChildWhichIsA("Part")
+    if not targetPart then
+        print("Target part not found!")
+        return
+    end
+
+    -- تحريك الذهب إلى الموقع الجديد
+    probGoldBar.CFrame = targetPart.CFrame
+    print("Gold moved to target!")
+end
+
+-- استدعاء دالة moveGoldBar مباشرة عند بداية السكربت
+moveGoldBar()
