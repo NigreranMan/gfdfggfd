@@ -9,15 +9,15 @@ local function moveGoldBar()
         return
     end
 
-    local probGoldBar = goldBar:FindFirstChild("Prob_GoldBar")
-    if not probGoldBar then
-        print("Prob_GoldBar not found inside GoldBar!")
+    local propGoldBar = goldBar:FindFirstChild("Prop_GoldBar")  -- تم تعديل الاسم هنا
+    if not propGoldBar then
+        print("Prop_GoldBar not found inside GoldBar!")  -- تم تعديل الاسم هنا
         return
     end
 
     -- Start Dragging
     local args = {
-        [1] = probGoldBar
+        [1] = propGoldBar  -- تم تعديل الاسم هنا
     }
 
     ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Remotes"):WaitForChild("RequestStartDrag"):FireServer(unpack(args))
@@ -39,7 +39,7 @@ local function moveGoldBar()
     end
 
     -- Move GoldBar to the selected part inside BountySquare
-    probGoldBar.CFrame = targetPart.CFrame
+    propGoldBar.CFrame = targetPart.CFrame  -- تم تعديل الاسم هنا
     print("GoldBar moved to the target part inside BountySquare!")
 end
 
